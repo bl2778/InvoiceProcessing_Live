@@ -170,17 +170,34 @@ def download_zip(job_id):
     zip_path = processing_results[job_id]['zip_path']
     return send_file(zip_path, as_attachment=True, download_name='processed_invoices.zip')
 
+
 @app.route('/report/<job_id>')
 def view_report(job_id):
     if job_id not in processing_results:
         flash('Processing results not found or expired')
         return redirect(url_for('index'))
     
-    results = processing_results[job_id]
+    results = processing_results[job_id]['results']
+    
+    # Sort results: successful ones by date first, then failed ones at the end
+    successful_results = [r for r in results if r['status'] == 'success']
+    failed_results = [r for r in results if r['status'] == 'failed']
+    
+    # Sort successful results by date (assuming date format is consistent)
+    try:
+        successful_results.sort(key=lambda x: x['date'] if x['date'] != 'Error' else '9999年99月99日')
+    except:
+        # If sorting fails, keep original order
+        pass
+    
+    # Combine: successful first, then failed
+    sorted_results = successful_results + failed_results
+    
     return render_template('report.html', 
-                         results=results['results'], 
-                         timestamp=results['timestamp'],
+                         results=sorted_results, 
+                         timestamp=processing_results[job_id]['timestamp'],
                          job_id=job_id)
+
 
 if __name__ == '__main__':
     import os
