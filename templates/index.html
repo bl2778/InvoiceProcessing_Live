@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Processor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+        }
+        .upload-area:hover {
+            background-color: #e9ecef;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .file-list {
+            margin: 20px 0;
+        }
+        .file-item {
+            padding: 10px;
+            background-color: #e9ecef;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .progress {
+            display: none;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Invoice Processor</h1>
+        <p>Upload your PDF invoices and get them automatically renamed and organized!</p>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div style="color: red; margin: 20px 0;">
+                    {% for message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <p>📁 Click here to select PDF files or drag and drop them</p>
+                <input type="file" id="fileInput" name="files" multiple accept=".pdf" style="display: none;">
+            </div>
+            
+            <div id="fileList" class="file-list"></div>
+            
+            <div class="progress" id="progress">
+                <div class="spinner"></div>
+                <p>Processing your files... This may take a few minutes.</p>
+            </div>
+            
+            <button type="submit" class="btn" id="submitBtn">Process Files</button>
+        </form>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const uploadForm = document.getElementById('uploadForm');
+        const progress = document.getElementById('progress');
+        const submitBtn = document.getElementById('submitBtn');
+
+        fileInput.addEventListener('change', function() {
+            fileList.innerHTML = '';
+            for (let i = 0; i < this.files.length; i++) {
+                const file = this.files[i];
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.textContent = file.name;
+                fileList.appendChild(fileItem);
+            }
+        });
+
+        uploadForm.addEventListener('submit', function() {
+            if (fileInput.files.length === 0) {
+                alert('Please select at least one PDF file');
+                return false;
+            }
+            progress.style.display = 'block';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+        });
+    </script>
+</body>
+</html>
