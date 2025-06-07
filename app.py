@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, send_file, flash, redirect, url_for
+from flask import Flask, request, render_template, send_file, flash, redirect, url_for, jsonify, session
 import os
 import zipfile
 import tempfile
@@ -6,20 +6,23 @@ import shutil
 from werkzeug.utils import secure_filename
 import pandas as pd
 from extractor import Extractor
+from datetime import datetime
+import uuid
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'  # Change this!
+app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 
 ALLOWED_EXTENSIONS = {'pdf'}
-ocr_error_counter = 1  # Global counter for OCR error files
+
+# In-memory storage for processing results (in production, use a database)
+processing_results = {}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def process_pdf_file(file_path):
+def process_pdf_file(file_path, results_list):
     """Process a single PDF file and return the new filename"""
-    global ocr_error_counter
     
     try:
         # Try OCR extraction first
@@ -46,14 +49,38 @@ def process_pdf_file(file_path):
             inv_date = "Error"
         
         new_filename = "_".join([inv_date, inv_value, inv_provider]) + ".pdf"
+        
+        # Store the extracted data for reporting
+        results_list.append({
+            'original_filename': os.path.basename(file_path),
+            'new_filename': new_filename,
+            'date': inv_date,
+            'amount': inv_value,
+            'issuer': inv_provider,
+            'status': 'success',
+            'method': 'OCR'
+        })
+        
         return new_filename
         
     except Exception as e:
         print(f"OCR failed for {os.path.basename(file_path)}: {e}")
         
         # Instead of using GPT, rename as OCRError + number
-        new_filename = f"OCRError{ocr_error_counter}.pdf"
-        ocr_error_counter += 1
+        original_filename = os.path.basename(file_path)
+        new_filename = f"OCRError_{original_filename}"
+        
+        # Store the failed result
+        results_list.append({
+            'original_filename': original_filename,
+            'new_filename': new_filename,
+            'date': 'N/A',
+            'amount': 'N/A',
+            'issuer': 'N/A',
+            'status': 'failed',
+            'method': 'OCR'
+        })
+        
         return new_filename
 
 @app.route('/')
@@ -62,22 +89,21 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    global ocr_error_counter
-    ocr_error_counter = 1  # Reset counter for each batch
-    
     if 'files' not in request.files:
-        flash('No files selected')
-        return redirect(request.url)
+        return jsonify({'success': False, 'message': 'No files selected'})
     
     files = request.files.getlist('files')
     
     if not files or files[0].filename == '':
-        flash('No files selected')
-        return redirect(request.url)
+        return jsonify({'success': False, 'message': 'No files selected'})
+    
+    # Generate unique session ID for this processing job
+    job_id = str(uuid.uuid4())
     
     # Create temporary directory for processing
     temp_dir = tempfile.mkdtemp()
     processed_files = []
+    results_list = []
     
     try:
         for file in files:
@@ -87,7 +113,7 @@ def upload_files():
                 file.save(file_path)
                 
                 # Process the file
-                new_filename = process_pdf_file(file_path)
+                new_filename = process_pdf_file(file_path, results_list)
                 new_file_path = os.path.join(temp_dir, new_filename)
                 
                 # Handle duplicate filenames
@@ -108,19 +134,55 @@ def upload_files():
             for file_path in processed_files:
                 zip_file.write(file_path, os.path.basename(file_path))
         
-        return send_file(zip_path, as_attachment=True, download_name='processed_invoices.zip')
+        # Store results and zip path
+        processing_results[job_id] = {
+            'zip_path': zip_path,
+            'temp_dir': temp_dir,
+            'results': results_list,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # Calculate statistics
+        total_files = len(results_list)
+        successful_files = len([r for r in results_list if r['status'] == 'success'])
+        failed_files = total_files - successful_files
+        
+        return jsonify({
+            'success': True,
+            'job_id': job_id,
+            'total_files': total_files,
+            'successful_files': successful_files,
+            'failed_files': failed_files,
+            'message': f'Processing complete! {successful_files}/{total_files} files processed successfully.'
+        })
         
     except Exception as e:
-        flash(f'Error processing files: {str(e)}')
+        # Clean up on error
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return jsonify({'success': False, 'message': f'Error processing files: {str(e)}'})
+
+@app.route('/download/<job_id>')
+def download_zip(job_id):
+    if job_id not in processing_results:
+        flash('Processing results not found or expired')
         return redirect(url_for('index'))
     
-    finally:
-        # Clean up temporary directory
-        shutil.rmtree(temp_dir, ignore_errors=True)
+    zip_path = processing_results[job_id]['zip_path']
+    return send_file(zip_path, as_attachment=True, download_name='processed_invoices.zip')
 
+@app.route('/report/<job_id>')
+def view_report(job_id):
+    if job_id not in processing_results:
+        flash('Processing results not found or expired')
+        return redirect(url_for('index'))
+    
+    results = processing_results[job_id]
+    return render_template('report.html', 
+                         results=results['results'], 
+                         timestamp=results['timestamp'],
+                         job_id=job_id)
 
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
-
