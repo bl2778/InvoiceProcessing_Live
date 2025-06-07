@@ -79,28 +79,15 @@
         tr:hover {
             background-color: #e9ecef;
         }
-        .status-success {
-            background: #28a745;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            font-weight: bold;
+        .failed-row {
+            background-color: #ffe6e6 !important;
         }
-        .status-failed {
-            background: #dc3545;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            font-weight: bold;
+        .failed-row:hover {
+            background-color: #ffcccc !important;
         }
-        .method-tag {
-            background: #17a2b8;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 8px;
-            font-size: 0.8em;
+        .review-failure {
+            color: #dc3545;
+            font-weight: bold;
         }
         .btn {
             background: linear-gradient(45deg, #007bff, #0056b3);
@@ -162,29 +149,37 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Original Filename</th>
                         <th>Date</th>
                         <th>Amount</th>
                         <th>Issuer</th>
-                        <th>Status</th>
-                        <th>Method</th>
-                        <th>New Filename</th>
+                        <th>Original Filename</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for result in results %}
-                    <tr>
-                        <td>📄 {{ result.original_filename }}</td>
-                        <td>{{ result.date }}</td>
-                        <td>{{ result.amount }}</td>
-                        <td>{{ result.issuer }}</td>
+                    <tr {% if result.status == 'failed' %}class="failed-row"{% endif %}>
                         <td>
-                            <span class="status-{{ result.status }}">
-                                {% if result.status == 'success' %}✅ Success{% else %}❌ Failed{% endif %}
-                            </span>
+                            {% if result.status == 'failed' %}
+                                <span class="review-failure">Review Failure</span>
+                            {% else %}
+                                {{ result.date }}
+                            {% endif %}
                         </td>
-                        <td><span class="method-tag">{{ result.method }}</span></td>
-                        <td>{{ result.new_filename }}</td>
+                        <td>
+                            {% if result.status == 'failed' %}
+                                <span class="review-failure">Review Failure</span>
+                            {% else %}
+                                {{ result.amount }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if result.status == 'failed' %}
+                                <span class="review-failure">Review Failure</span>
+                            {% else %}
+                                {{ result.issuer }}
+                            {% endif %}
+                        </td>
+                        <td>{{ result.original_filename }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -192,7 +187,7 @@
         </div>
 
         <div class="actions">
-            <a href="/download/{{ job_id }}" class="btn">📥 Download ZIP File</a>
+            <a href="/download/{{ job_id }}" class="btn">📥 Download Renamed Invoices</a>
             <a href="/" class="btn" style="background: linear-gradient(45deg, #6c757d, #5a6268);">🏠 Process More Files</a>
         </div>
     </div>
