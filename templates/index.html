@@ -6,62 +6,145 @@
     <title>Invoice Processor</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
         .container {
             background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            flex: 1;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
         }
         .upload-area {
-            border: 2px dashed #007bff;
-            border-radius: 10px;
-            padding: 40px;
+            border: 3px dashed #007bff;
+            border-radius: 15px;
+            padding: 50px;
             text-align: center;
-            margin: 20px 0;
-            background-color: #f8f9fa;
+            margin: 30px 0;
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            transition: all 0.3s ease;
         }
         .upload-area:hover {
-            background-color: #e9ecef;
+            background: linear-gradient(45deg, #e9ecef, #dee2e6);
+            transform: translateY(-2px);
         }
         .btn {
-            background-color: #007bff;
+            background: linear-gradient(45deg, #007bff, #0056b3);
             color: white;
-            padding: 12px 24px;
+            padding: 15px 30px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
         }
         .btn:hover {
-            background-color: #0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.4);
+        }
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
         }
         .file-list {
             margin: 20px 0;
+            max-height: 200px;
+            overflow-y: auto;
         }
         .file-item {
-            padding: 10px;
-            background-color: #e9ecef;
-            margin: 5px 0;
-            border-radius: 5px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
         }
         .progress {
             display: none;
-            margin: 20px 0;
+            margin: 30px 0;
+            text-align: center;
         }
         .spinner {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #007bff;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
+            margin: 0 auto 20px;
+        }
+        .results {
+            display: none;
+            margin: 30px 0;
+            padding: 25px;
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
+            border-radius: 10px;
+            border-left: 5px solid #28a745;
+        }
+        .results h3 {
+            color: #155724;
+            margin-bottom: 15px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+        }
+        .btn-info {
+            background: linear-gradient(45deg, #17a2b8, #138496);
+        }
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: white;
+            margin-top: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -72,11 +155,11 @@
 <body>
     <div class="container">
         <h1>📄 Invoice Processor</h1>
-        <p>Upload your PDF invoices and get them automatically renamed and organized!</p>
+        <p class="subtitle">Upload your PDF invoices and get them automatically renamed and organized!</p>
         
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div style="color: red; margin: 20px 0;">
+                <div style="color: #dc3545; margin: 20px 0; padding: 15px; background: #f8d7da; border-radius: 5px;">
                     {% for message in messages %}
                         <p>{{ message }}</p>
                     {% endfor %}
@@ -84,9 +167,10 @@
             {% endif %}
         {% endwith %}
         
-        <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+        <form id="uploadForm" enctype="multipart/form-data">
             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <p>📁 Click here to select PDF files or drag and drop them</p>
+                <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Click here to select PDF files</p>
+                <p style="color: #666;">or drag and drop them here</p>
                 <input type="file" id="fileInput" name="files" multiple accept=".pdf" style="display: none;">
             </div>
             
@@ -94,11 +178,41 @@
             
             <div class="progress" id="progress">
                 <div class="spinner"></div>
-                <p>Processing your files... This may take a few minutes.</p>
+                <p><strong>Processing your files...</strong></p>
+                <p>This may take a few minutes depending on the number of files.</p>
             </div>
             
-            <button type="submit" class="btn" id="submitBtn">Process Files</button>
+            <div class="results" id="results">
+                <h3>🎉 Processing Complete!</h3>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalFiles">0</div>
+                        <div class="stat-label">Total Files</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="successfulFiles">0</div>
+                        <div class="stat-label">Successfully Processed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="failedFiles">0</div>
+                        <div class="stat-label">Failed to Process</div>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button type="button" class="btn btn-success" id="downloadBtn">📥 Download ZIP</button>
+                    <button type="button" class="btn btn-info" id="viewReportBtn">📊 View Report</button>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <button type="submit" class="btn" id="submitBtn">🚀 Process Files</button>
+            </div>
         </form>
+    </div>
+
+    <div class="footer">
+        <p><strong>Disclaimer:</strong> This tool is for personal use only.</p>
+        <p>© 2025 Ben Li (ben.li@bain.com). All rights reserved.</p>
     </div>
 
     <script>
@@ -106,7 +220,9 @@
         const fileList = document.getElementById('fileList');
         const uploadForm = document.getElementById('uploadForm');
         const progress = document.getElementById('progress');
+        const results = document.getElementById('results');
         const submitBtn = document.getElementById('submitBtn');
+        let currentJobId = null;
 
         fileInput.addEventListener('change', function() {
             fileList.innerHTML = '';
@@ -114,19 +230,64 @@
                 const file = this.files[i];
                 const fileItem = document.createElement('div');
                 fileItem.className = 'file-item';
-                fileItem.textContent = file.name;
+                fileItem.textContent = `📄 ${file.name}`;
                 fileList.appendChild(fileItem);
             }
         });
 
-        uploadForm.addEventListener('submit', function() {
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
             if (fileInput.files.length === 0) {
                 alert('Please select at least one PDF file');
-                return false;
+                return;
             }
+
+            const formData = new FormData();
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('files', fileInput.files[i]);
+            }
+
             progress.style.display = 'block';
+            results.style.display = 'none';
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Processing...';
+            submitBtn.textContent = '🔄 Processing...';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                progress.style.display = 'none';
+                
+                if (data.success) {
+                    currentJobId = data.job_id;
+                    document.getElementById('totalFiles').textContent = data.total_files;
+                    document.getElementById('successfulFiles').textContent = data.successful_files;
+                    document.getElementById('failedFiles').textContent = data.failed_files;
+                    results.style.display = 'block';
+                    
+                    document.getElementById('downloadBtn').onclick = function() {
+                        window.location.href = `/download/${currentJobId}`;
+                    };
+                    
+                    document.getElementById('viewReportBtn').onclick = function() {
+                        window.open(`/report/${currentJobId}`, '_blank');
+                    };
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                progress.style.display = 'none';
+                alert('An error occurred while processing files.');
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 Process Files';
+            });
         });
     </script>
 </body>
