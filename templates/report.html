@@ -241,123 +241,132 @@
     </div>
 
     <script>
-        // Store current sort order for each column
-        let sortOrder = {0: 'none', 1: 'none', 2: 'none', 3: 'none'};
-
-        function parseChineseDate(dateStr) {
-            // Parse Chinese date format like "2024年3月15日"
-            if (dateStr === 'Review Failure' || dateStr === 'Error' || dateStr === 'N/A') {
-                return new Date('9999-12-31'); // Put errors at the end
-            }
-            
-            const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-            if (match) {
-                const [, year, month, day] = match;
-                return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-            }
-            return new Date('9999-12-31'); // Unknown format, put at end
+    // Store current sort order for each column
+    let sortOrder = {0: 'none', 1: 'none', 2: 'none', 3: 'none'};
+    
+    function parseChineseDate(dateStr) {
+        // Parse Chinese date format like "2024年3月15日"
+        if (dateStr === 'Review Failure' || dateStr === 'Error' || dateStr === 'N/A') {
+            return new Date('9999-12-31'); // Put errors at the end
         }
-
-        function parseAmount(amountStr) {
-            // Extract numeric value from amount string
-            if (amountStr === 'Review Failure' || amountStr === 'Error' || amountStr === 'N/A') {
-                return -1; // Put errors at the end
+        
+        const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        if (match) {
+            const [, year, month, day] = match;
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        }
+        return new Date('9999-12-31'); // Unknown format, put at end
+    }
+    
+    function parseAmount(amountStr) {
+        // Extract numeric value from amount string
+        if (amountStr === 'Review Failure' || amountStr === 'Error' || amountStr === 'N/A') {
+            return -1; // Put errors at the end
+        }
+        
+        // Remove non-numeric characters except decimal point
+        const numStr = amountStr.replace(/[^\d.-]/g, '');
+        const num = parseFloat(numStr);
+        return isNaN(num) ? -1 : num;
+    }
+    
+    function sortTable(columnIndex) {
+        const table = document.getElementById('reportTable');
+        const tbody = document.getElementById('tableBody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        // 分离成功和失败的行
+        const successRows = rows.filter(row => row.getAttribute('data-status') === 'success');
+        const failedRows = rows.filter(row => row.getAttribute('data-status') === 'failed');
+        
+        // Update sort order
+        if (sortOrder[columnIndex] === 'none' || sortOrder[columnIndex] === 'desc') {
+            sortOrder[columnIndex] = 'asc';
+        } else {
+            sortOrder[columnIndex] = 'desc';
+        }
+        
+        // Reset other columns
+        for (let i = 0; i < 4; i++) {
+            if (i !== columnIndex) {
+                sortOrder[i] = 'none';
+                document.getElementById(`sort-${i}`).innerHTML = '⇅';
+                document.getElementById(`sort-${i}`).classList.remove('active');
+            }
+        }
+        
+        // Update sort icon
+        const sortIcon = document.getElementById(`sort-${columnIndex}`);
+        sortIcon.classList.add('active');
+        sortIcon.innerHTML = sortOrder[columnIndex] === 'asc' ? '↑' : '↓';
+        
+        // Sort only the successful rows
+        successRows.sort((a, b) => {
+            const aCell = a.cells[columnIndex];
+            const bCell = b.cells[columnIndex];
+            const aData = aCell.getAttribute('data-original') || aCell.textContent.trim();
+            const bData = bCell.getAttribute('data-original') || bCell.textContent.trim();
+            
+            let aValue, bValue;
+            
+            // Handle different column types
+            switch (columnIndex) {
+                case 0: // Date column
+                    aValue = parseChineseDate(aData);
+                    bValue = parseChineseDate(bData);
+                    break;
+                case 1: // Amount column
+                    aValue = parseAmount(aData);
+                    bValue = parseAmount(bData);
+                    break;
+                case 2: // Issuer column
+                case 3: // Filename column
+                    aValue = aData.toLowerCase();
+                    bValue = bData.toLowerCase();
+                    break;
+                default:
+                    aValue = aData;
+                    bValue = bData;
             }
             
-            // Remove non-numeric characters except decimal point
-            const numStr = amountStr.replace(/[^\d.-]/g, '');
-            const num = parseFloat(numStr);
-            return isNaN(num) ? -1 : num;
-        }
-
-        function sortTable(columnIndex) {
-            const table = document.getElementById('reportTable');
-            const tbody = document.getElementById('tableBody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            // Update sort order
-            if (sortOrder[columnIndex] === 'none' || sortOrder[columnIndex] === 'desc') {
-                sortOrder[columnIndex] = 'asc';
+            // Compare values
+            let comparison = 0;
+            if (columnIndex === 0 || columnIndex === 1) {
+                // Date and Amount comparison
+                comparison = aValue - bValue;
             } else {
-                sortOrder[columnIndex] = 'desc';
+                // String comparison
+                comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
             }
             
-            // Reset other columns
-            for (let i = 0; i < 4; i++) {
-                if (i !== columnIndex) {
-                    sortOrder[i] = 'none';
-                    document.getElementById(`sort-${i}`).innerHTML = '⇅';
-                    document.getElementById(`sort-${i}`).classList.remove('active');
-                }
-            }
-            
-            // Update sort icon
-            const sortIcon = document.getElementById(`sort-${columnIndex}`);
-            sortIcon.classList.add('active');
-            sortIcon.innerHTML = sortOrder[columnIndex] === 'asc' ? '↑' : '↓';
-            
-            // Sort rows
-            rows.sort((a, b) => {
-                const aCell = a.cells[columnIndex];
-                const bCell = b.cells[columnIndex];
-                const aData = aCell.getAttribute('data-original') || aCell.textContent.trim();
-                const bData = bCell.getAttribute('data-original') || bCell.textContent.trim();
-                
-                let aValue, bValue;
-                
-                // Handle different column types
-                switch (columnIndex) {
-                    case 0: // Date column
-                        aValue = parseChineseDate(aData);
-                        bValue = parseChineseDate(bData);
-                        break;
-                    case 1: // Amount column
-                        aValue = parseAmount(aData);
-                        bValue = parseAmount(bData);
-                        break;
-                    case 2: // Issuer column
-                    case 3: // Filename column
-                        aValue = aData.toLowerCase();
-                        bValue = bData.toLowerCase();
-                        break;
-                    default:
-                        aValue = aData;
-                        bValue = bData;
-                }
-                
-                // Compare values
-                let comparison = 0;
-                if (columnIndex === 0 || columnIndex === 1) {
-                    // Date and Amount comparison
-                    comparison = aValue - bValue;
-                } else {
-                    // String comparison
-                    comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-                }
-                
-                return sortOrder[columnIndex] === 'asc' ? comparison : -comparison;
-            });
-            
-            // Reorder the table
-            rows.forEach(row => tbody.appendChild(row));
-        }
-
-        // Add hover effects to headers
-        document.querySelectorAll('th').forEach(header => {
-            header.addEventListener('mouseenter', function() {
-                const sortIcon = this.querySelector('.sort-icon');
-                if (sortIcon && !sortIcon.classList.contains('active')) {
-                    sortIcon.style.opacity = '1';
-                }
-            });
-            
-            header.addEventListener('mouseleave', function() {
-                const sortIcon = this.querySelector('.sort-icon');
-                if (sortIcon && !sortIcon.classList.contains('active')) {
-                    sortIcon.style.opacity = '0.7';
-                }
-            });
+            return sortOrder[columnIndex] === 'asc' ? comparison : -comparison;
         });
+        
+        // Clear the table body
+        tbody.innerHTML = '';
+        
+        // Reorder the table: successful rows first, then failed rows at the end
+        successRows.forEach(row => tbody.appendChild(row));
+        failedRows.forEach(row => tbody.appendChild(row));
+    }
+    
+    // Add hover effects to headers
+    document.querySelectorAll('th').forEach(header => {
+        header.addEventListener('mouseenter', function() {
+            const sortIcon = this.querySelector('.sort-icon');
+            if (sortIcon && !sortIcon.classList.contains('active')) {
+                sortIcon.style.opacity = '1';
+            }
+        });
+        
+        header.addEventListener('mouseleave', function() {
+            const sortIcon = this.querySelector('.sort-icon');
+            if (sortIcon && !sortIcon.classList.contains('active')) {
+                sortIcon.style.opacity = '0.7';
+            }
+        });
+    });
     </script>
+
 </body>
 </html>
