@@ -179,18 +179,35 @@ def view_report(job_id):
     
     results = processing_results[job_id]['results']
     
-    # Sort results: successful ones by date first, then failed ones at the end
+    # Separate successful and failed results
     successful_results = [r for r in results if r['status'] == 'success']
     failed_results = [r for r in results if r['status'] == 'failed']
     
-    # Sort successful results by date (assuming date format is consistent)
+    # Function to convert Chinese date format to datetime for sorting
+    def parse_chinese_date(date_str):
+        try:
+            if date_str == 'Error' or date_str == 'N/A':
+                return datetime(9999, 12, 31)  # Put errors at the end
+            
+            # Extract year, month, day from format like "2024年3月15日"
+            import re
+            match = re.match(r'(\d{4})年(\d{1,2})月(\d{1,2})日', date_str)
+            if match:
+                year, month, day = match.groups()
+                return datetime(int(year), int(month), int(day))
+            else:
+                return datetime(9999, 12, 31)  # Put unparseable dates at the end
+        except:
+            return datetime(9999, 12, 31)  # Put any parsing errors at the end
+    
+    # Sort successful results by parsed date
     try:
-        successful_results.sort(key=lambda x: x['date'] if x['date'] != 'Error' else '9999年99月99日')
+        successful_results.sort(key=lambda x: parse_chinese_date(x['date']))
     except:
         # If sorting fails, keep original order
         pass
     
-    # Combine: successful first, then failed
+    # Combine: successful first (sorted by date), then failed
     sorted_results = successful_results + failed_results
     
     return render_template('report.html', 
