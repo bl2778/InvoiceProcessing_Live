@@ -140,7 +140,7 @@ def upload_files():
             'zip_path': zip_path,
             'temp_dir': temp_dir,
             'results': results_list,
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'timestamp': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
         }
         
         # Calculate statistics
