@@ -9,6 +9,8 @@ from extractor import Extractor
 from datetime import datetime
 import uuid
 import re
+import threading
+import time
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
@@ -89,6 +91,19 @@ def index():
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
+def schedule_cleanup(job_id, delay=3600): 
+    """安排在指定时间后清理临时文件和数据"""
+    def cleanup():
+        time.sleep(delay)
+        if job_id in processing_results:
+            result = processing_results[job_id]
+            temp_dir = result.get('temp_dir')
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            processing_results.pop(job_id, None)
+            print(f"Auto-cleaned job: {job_id}")
+    
+    threading.Thread(target=cleanup, daemon=True).start()
 def upload_files():
     if 'files' not in request.files:
         return jsonify({'success': False, 'message': 'No files selected'})
@@ -142,6 +157,8 @@ def upload_files():
             'results': results_list,
             'timestamp': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
         }
+
+        schedule_cleanup(job_id)  # 安排1小时后自动清理
         
         # Calculate statistics
         total_files = len(results_list)
