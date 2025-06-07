@@ -11,6 +11,8 @@ import uuid
 import re
 import threading
 import time
+import json
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
@@ -20,6 +22,129 @@ ALLOWED_EXTENSIONS = {'pdf'}
 
 # In-memory storage for processing results (in production, use a database)
 processing_results = {}
+
+access_logs = []
+processing_results = {}
+
+ADMIN_PASSWORD = "admin0214"
+
+def log_access(endpoint, extra_data=None):
+    """记录用户访问"""
+    try:
+        log_entry = {
+            'timestamp': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
+            'ip': request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown')),
+            'user_agent': request.headers.get('User-Agent', 'unknown'),
+            'endpoint': endpoint,
+            'method': request.method,
+            'referer': request.headers.get('Referer', 'direct'),
+            'extra_data': extra_data or {}
+        }
+        access_logs.append(log_entry)
+        
+        # 只保留最近1000条记录，避免内存溢出
+        if len(access_logs) > 1000:
+            access_logs.pop(0)
+            
+        print(f"访问记录: {log_entry['ip']} -> {endpoint}")
+    except Exception as e:
+        print(f"记录访问日志失败: {e}")
+
+def require_admin(f):
+    """管理员验证装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'admin_authenticated' not in session:
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/')
+def index():
+    log_access('主页访问')
+    return render_template('index.html')
+
+@app.route('/upload', methods=['POST'])
+def upload_files():
+    # 记录文件上传访问
+    file_count = len(request.files.getlist('files'))
+    log_access('文件上传', {'file_count': file_count})
+    
+    # ... 你原有的upload_files代码保持不变 ...
+    
+@app.route('/download/<job_id>')
+def download_zip(job_id):
+    log_access('文件下载', {'job_id': job_id})
+    # ... 你原有的代码 ...
+
+@app.route('/report/<job_id>')
+def view_report(job_id):
+    log_access('查看报告', {'job_id': job_id})
+    # ... 你原有的代码 ...
+
+# ============ 新增管理后台功能 ============
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == ADMIN_PASSWORD:
+            session['admin_authenticated'] = True
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash('密码错误')
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_authenticated', None)
+    return redirect(url_for('index'))
+
+@app.route('/admin')
+@require_admin
+def admin_dashboard():
+    # 统计数据
+    total_visits = len(access_logs)
+    unique_ips = len(set(log['ip'] for log in access_logs))
+    upload_count = len([log for log in access_logs if log['endpoint'] == '文件上传'])
+    download_count = len([log for log in access_logs if log['endpoint'] == '文件下载'])
+    
+    # 最近24小时的访问
+    recent_logs = []
+    current_time = datetime.now()
+    for log in access_logs[-50:]:  # 显示最近50条
+        recent_logs.append(log)
+    
+    stats = {
+        'total_visits': total_visits,
+        'unique_ips': unique_ips,
+        'upload_count': upload_count,
+        'download_count': download_count,
+        'total_jobs': len(processing_results)
+    }
+    
+    return render_template('admin_dashboard.html', 
+                         logs=recent_logs, 
+                         stats=stats)
+
+@app.route('/admin/logs/export')
+@require_admin
+def export_logs():
+    """导出访问日志为JSON文件"""
+    log_data = {
+        'export_time': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
+        'total_records': len(access_logs),
+        'logs': access_logs
+    }
+    
+    # 创建临时文件
+    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+    json.dump(log_data, temp_file, ensure_ascii=False, indent=2)
+    temp_file.close()
+    
+    return send_file(temp_file.name, 
+                    as_attachment=True, 
+                    download_name=f'access_logs_{datetime.now().strftime("%Y%m%d_%H%M")}.json')
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
