@@ -1,5 +1,6 @@
-Flask==2.3.3
-pdfplumber==0.9.0
-pandas==2.0.3
-regex==2023.8.8
-Werkzeug==2.3.7
+Flask==3.0.0
+pdfplumber==0.10.0
+pandas==2.1.4
+numpy==1.26.2
+regex==2023.10.3
+Werkzeug==3.0.1
