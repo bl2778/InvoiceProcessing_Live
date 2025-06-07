@@ -244,7 +244,7 @@
         // Store current sort order for each column
         let sortOrder = {0: 'none', 1: 'none', 2: 'none', 3: 'none'};
 
-        function parseChinese Date(dateStr) {
+        function parseChineseDate(dateStr) {
             // Parse Chinese date format like "2024年3月15日"
             if (dateStr === 'Review Failure' || dateStr === 'Error' || dateStr === 'N/A') {
                 return new Date('9999-12-31'); // Put errors at the end
