@@ -25,7 +25,7 @@ access_logs = []
 processing_results = {}
 
 # 管理员密码
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = "admin0214"
 
 def log_access(endpoint, extra_data=None):
     """记录用户访问"""
