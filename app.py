@@ -11,15 +11,65 @@ import uuid
 import re
 import threading
 import time
+import json
+from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
+app.secret_key = 'your-secret-key-change-this-in-production'
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {'pdf'}
 
-# In-memory storage for processing results (in production, use a database)
+# 存储访问记录和处理结果
+access_logs = []
 processing_results = {}
+
+# 管理员密码
+ADMIN_PASSWORD = "admin0214"
+
+def log_access(endpoint, extra_data=None):
+    """记录用户访问"""
+    try:
+        log_entry = {
+            'timestamp': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
+            'ip': request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown')),
+            'user_agent': request.headers.get('User-Agent', 'unknown'),
+            'endpoint': endpoint,
+            'method': request.method,
+            'referer': request.headers.get('Referer', 'direct'),
+            'extra_data': extra_data or {}
+        }
+        access_logs.append(log_entry)
+        
+        if len(access_logs) > 1000:
+            access_logs.pop(0)
+            
+        print(f"访问记录: {log_entry['ip']} -> {endpoint}")
+    except Exception as e:
+        print(f"记录访问日志失败: {e}")
+
+def require_admin(f):
+    """管理员验证装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'admin_authenticated' not in session:
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def schedule_cleanup(job_id, delay=3600):
+    """安排在指定时间后清理临时文件和数据"""
+    def cleanup():
+        time.sleep(delay)
+        if job_id in processing_results:
+            result = processing_results[job_id]
+            temp_dir = result.get('temp_dir')
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            processing_results.pop(job_id, None)
+            print(f"Auto-cleaned job: {job_id}")
+    
+    threading.Thread(target=cleanup, daemon=True).start()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -86,25 +136,18 @@ def process_pdf_file(file_path, results_list):
         
         return new_filename
 
+# ============ 主要路由 ============
+
 @app.route('/')
 def index():
+    log_access('主页访问')
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
-def schedule_cleanup(job_id, delay=3600): 
-    """安排在指定时间后清理临时文件和数据"""
-    def cleanup():
-        time.sleep(delay)
-        if job_id in processing_results:
-            result = processing_results[job_id]
-            temp_dir = result.get('temp_dir')
-            if temp_dir and os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            processing_results.pop(job_id, None)
-            print(f"Auto-cleaned job: {job_id}")
-    
-    threading.Thread(target=cleanup, daemon=True).start()
 def upload_files():
+    file_count = len(request.files.getlist('files'))
+    log_access('文件上传', {'file_count': file_count})
+    
     if 'files' not in request.files:
         return jsonify({'success': False, 'message': 'No files selected'})
     
@@ -113,10 +156,7 @@ def upload_files():
     if not files or files[0].filename == '':
         return jsonify({'success': False, 'message': 'No files selected'})
     
-    # Generate unique session ID for this processing job
     job_id = str(uuid.uuid4())
-    
-    # Create temporary directory for processing
     temp_dir = tempfile.mkdtemp()
     processed_files = []
     results_list = []
@@ -128,11 +168,9 @@ def upload_files():
                 file_path = os.path.join(temp_dir, filename)
                 file.save(file_path)
                 
-                # Process the file
                 new_filename = process_pdf_file(file_path, results_list)
                 new_file_path = os.path.join(temp_dir, new_filename)
                 
-                # Handle duplicate filenames
                 counter = 1
                 while os.path.exists(new_file_path):
                     base, ext = os.path.splitext(new_filename)
@@ -140,27 +178,23 @@ def upload_files():
                     new_file_path = os.path.join(temp_dir, new_filename)
                     counter += 1
                 
-                # Rename the processed file
                 shutil.move(file_path, new_file_path)
                 processed_files.append(new_file_path)
         
-        # Create ZIP file
         zip_path = os.path.join(temp_dir, 'processed_invoices.zip')
         with zipfile.ZipFile(zip_path, 'w') as zip_file:
             for file_path in processed_files:
                 zip_file.write(file_path, os.path.basename(file_path))
         
-        # Store results and zip path
         processing_results[job_id] = {
             'zip_path': zip_path,
             'temp_dir': temp_dir,
             'results': results_list,
             'timestamp': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
         }
-
-        schedule_cleanup(job_id)  # 安排1小时后自动清理
         
-        # Calculate statistics
+        schedule_cleanup(job_id)
+        
         total_files = len(results_list)
         successful_files = len([r for r in results_list if r['status'] == 'success'])
         failed_files = total_files - successful_files
@@ -175,12 +209,12 @@ def upload_files():
         })
         
     except Exception as e:
-        # Clean up on error
         shutil.rmtree(temp_dir, ignore_errors=True)
         return jsonify({'success': False, 'message': f'Error processing files: {str(e)}'})
 
 @app.route('/download/<job_id>')
 def download_zip(job_id):
+    log_access('文件下载', {'job_id': job_id})
     if job_id not in processing_results:
         flash('Processing results not found or expired')
         return redirect(url_for('index'))
@@ -188,44 +222,39 @@ def download_zip(job_id):
     zip_path = processing_results[job_id]['zip_path']
     return send_file(zip_path, as_attachment=True, download_name='processed_invoices.zip')
 
-
 @app.route('/report/<job_id>')
 def view_report(job_id):
+    log_access('查看报告', {'job_id': job_id})
     if job_id not in processing_results:
         flash('Processing results not found or expired')
         return redirect(url_for('index'))
     
     results = processing_results[job_id]['results']
     
-    # Separate successful and failed results
+    # Sort results: successful ones by date first, then failed ones at the end
     successful_results = [r for r in results if r['status'] == 'success']
     failed_results = [r for r in results if r['status'] == 'failed']
     
-    # Function to convert Chinese date format to datetime for sorting
+    # Sort successful results by date
     def parse_chinese_date(date_str):
         try:
             if date_str == 'Error' or date_str == 'N/A':
-                return datetime(9999, 12, 31)  # Put errors at the end
+                return datetime(9999, 12, 31)
             
-            # Extract year, month, day from format like "2024年3月15日"
-            import re
             match = re.match(r'(\d{4})年(\d{1,2})月(\d{1,2})日', date_str)
             if match:
                 year, month, day = match.groups()
                 return datetime(int(year), int(month), int(day))
             else:
-                return datetime(9999, 12, 31)  # Put unparseable dates at the end
+                return datetime(9999, 12, 31)
         except:
-            return datetime(9999, 12, 31)  # Put any parsing errors at the end
+            return datetime(9999, 12, 31)
     
-    # Sort successful results by parsed date
     try:
         successful_results.sort(key=lambda x: parse_chinese_date(x['date']))
     except:
-        # If sorting fails, keep original order
         pass
     
-    # Combine: successful first (sorted by date), then failed
     sorted_results = successful_results + failed_results
     
     return render_template('report.html', 
@@ -233,6 +262,63 @@ def view_report(job_id):
                          timestamp=processing_results[job_id]['timestamp'],
                          job_id=job_id)
 
+# ============ 管理员功能 ============
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == ADMIN_PASSWORD:
+            session['admin_authenticated'] = True
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash('密码错误')
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_authenticated', None)
+    return redirect(url_for('index'))
+
+@app.route('/admin')
+@require_admin
+def admin_dashboard():
+    total_visits = len(access_logs)
+    unique_ips = len(set(log['ip'] for log in access_logs))
+    upload_count = len([log for log in access_logs if log['endpoint'] == '文件上传'])
+    download_count = len([log for log in access_logs if log['endpoint'] == '文件下载'])
+    
+    recent_logs = access_logs[-50:]
+    
+    stats = {
+        'total_visits': total_visits,
+        'unique_ips': unique_ips,
+        'upload_count': upload_count,
+        'download_count': download_count,
+        'total_jobs': len(processing_results)
+    }
+    
+    return render_template('admin_dashboard.html', 
+                         logs=recent_logs, 
+                         stats=stats)
+
+@app.route('/admin/logs/export')
+@require_admin
+def export_logs():
+    """导出访问日志为JSON文件"""
+    log_data = {
+        'export_time': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
+        'total_records': len(access_logs),
+        'logs': access_logs
+    }
+    
+    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+    json.dump(log_data, temp_file, ensure_ascii=False, indent=2)
+    temp_file.close()
+    
+    return send_file(temp_file.name, 
+                    as_attachment=True, 
+                    download_name=f'access_logs_{datetime.now().strftime("%Y%m%d_%H%M")}.json')
 
 if __name__ == '__main__':
     import os
