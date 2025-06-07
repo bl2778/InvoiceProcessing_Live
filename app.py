@@ -8,6 +8,7 @@ import pandas as pd
 from extractor import Extractor
 from datetime import datetime
 import uuid
+import re
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'  # Change this!
