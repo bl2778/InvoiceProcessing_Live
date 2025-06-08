@@ -13,6 +13,7 @@ import threading
 import time
 import json
 from functools import wraps
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-change-this-in-production'
@@ -24,8 +25,97 @@ ALLOWED_EXTENSIONS = {'pdf'}
 access_logs = []
 processing_results = {}
 
+# IP地理位置缓存（避免重复查询相同IP）
+ip_location_cache = {}
+
 # 管理员密码
-ADMIN_PASSWORD = "admin0214"
+ADMIN_PASSWORD = "admin123"
+
+def get_ip_location(ip_address):
+    """查询IP地址的地理位置"""
+    # 检查缓存
+    if ip_address in ip_location_cache:
+        return ip_location_cache[ip_address]
+    
+    # 跳过本地和内网IP
+    if ip_address in ['unknown', '127.0.0.1', 'localhost'] or ip_address.startswith('192.168.') or ip_address.startswith('10.'):
+        location = "本地/内网"
+        ip_location_cache[ip_address] = location
+        return location
+    
+    try:
+        # 使用免费的ip-api.com服务查询IP地理位置
+        response = requests.get(f'http://ip-api.com/json/{ip_address}?lang=zh-CN', timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data['status'] == 'success':
+                # 组合地理位置信息：国家 - 省/州 - 城市
+                country = data.get('country', '')
+                region = data.get('regionName', '')
+                city = data.get('city', '')
+                
+                location_parts = []
+                if country:
+                    location_parts.append(country)
+                if region and region != country:
+                    location_parts.append(region)
+                if city and city != region:
+                    location_parts.append(city)
+                
+                location = ' - '.join(location_parts) if location_parts else '未知'
+                
+                # 缓存结果
+                ip_location_cache[ip_address] = location
+                return location
+            else:
+                location = "查询失败"
+        else:
+            location = "API错误"
+            
+    except Exception as e:
+        print(f"IP地理位置查询失败: {e}")
+        location = "查询异常"
+    
+    # 缓存失败结果，避免重复查询
+    ip_location_cache[ip_address] = location
+    return location
+
+def log_access(endpoint, extra_data=None):
+    """记录用户访问"""
+    try:
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
+        
+        # 获取IP地理位置（异步处理避免阻塞主请求）
+        def get_location_async():
+            location = get_ip_location(ip_address)
+            # 更新已记录的日志条目
+            for log in reversed(access_logs):
+                if log.get('ip') == ip_address and 'location' not in log:
+                    log['location'] = location
+                    break
+        
+        log_entry = {
+            'timestamp': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
+            'ip': ip_address,
+            'location': '查询中...',  # 先设置为查询中，异步更新
+            'user_agent': request.headers.get('User-Agent', 'unknown'),
+            'endpoint': endpoint,
+            'method': request.method,
+            'referer': request.headers.get('Referer', 'direct'),
+            'extra_data': extra_data or {}
+        }
+        access_logs.append(log_entry)
+        
+        # 启动异步线程查询地理位置
+        threading.Thread(target=get_location_async, daemon=True).start()
+        
+        # 只保留最近1000条记录
+        if len(access_logs) > 1000:
+            access_logs.pop(0)
+            
+        print(f"访问记录: {ip_address} -> {endpoint}")
+    except Exception as e:
+        print(f"记录访问日志失败: {e}")
 
 def log_access(endpoint, extra_data=None):
     """记录用户访问"""
@@ -283,19 +373,34 @@ def admin_logout():
 @app.route('/admin')
 @require_admin
 def admin_dashboard():
+    # 统计数据
     total_visits = len(access_logs)
     unique_ips = len(set(log['ip'] for log in access_logs))
     upload_count = len([log for log in access_logs if log['endpoint'] == '文件上传'])
     download_count = len([log for log in access_logs if log['endpoint'] == '文件下载'])
     
-    recent_logs = access_logs[-50:]
+    # 地理位置统计
+    location_stats = {}
+    for log in access_logs:
+        location = log.get('location', '未知')
+        if location and location not in ['查询中...', '查询失败', 'API错误', '查询异常']:
+            location_stats[location] = location_stats.get(location, 0) + 1
+    
+    # 获取最近50条记录，并确保地理位置已查询
+    recent_logs = []
+    for log in access_logs[-50:]:
+        # 如果地理位置还在查询中，尝试立即查询一次
+        if log.get('location') == '查询中...':
+            log['location'] = get_ip_location(log['ip'])
+        recent_logs.append(log)
     
     stats = {
         'total_visits': total_visits,
         'unique_ips': unique_ips,
         'upload_count': upload_count,
         'download_count': download_count,
-        'total_jobs': len(processing_results)
+        'total_jobs': len(processing_results),
+        'top_locations': sorted(location_stats.items(), key=lambda x: x[1], reverse=True)[:5]  # 前5个地理位置
     }
     
     return render_template('admin_dashboard.html', 
