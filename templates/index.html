@@ -32,6 +32,60 @@
             color: #666;
             margin-bottom: 30px;
         }
+        
+        /* AI Settings Area */
+        .ai-settings {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .ai-toggle {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .ai-toggle input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+        .ai-toggle label {
+            font-weight: bold;
+            color: #495057;
+            cursor: pointer;
+        }
+        .ai-options {
+            display: none;
+            margin-top: 15px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #495057;
+        }
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group select:focus, .form-group input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        .api-key-hint {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
         .upload-area {
             border: 3px dashed #007bff;
             border-radius: 15px;
@@ -40,6 +94,7 @@
             margin: 30px 0;
             background: linear-gradient(45deg, #f8f9fa, #e9ecef);
             transition: all 0.3s ease;
+            cursor: pointer;
         }
         .upload-area:hover {
             background: linear-gradient(45deg, #e9ecef, #dee2e6);
@@ -77,20 +132,55 @@
             border-radius: 8px;
             border-left: 4px solid #007bff;
         }
-        .progress {
+        
+        /* Progress Bar Styles */
+        .progress-container {
             display: none;
             margin: 30px 0;
             text-align: center;
         }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #007bff;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+        .progress-bar-container {
+            width: 100%;
+            height: 30px;
+            background-color: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
         }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(45deg, #28a745, #20c997);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #333;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 10;
+        }
+        .progress-status {
+            margin: 10px 0;
+            font-size: 16px;
+            color: #495057;
+        }
+        .progress-phase {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #17a2b8;
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
         .results {
             display: none;
             margin: 30px 0;
@@ -146,16 +236,12 @@
             border-radius: 10px;
             backdrop-filter: blur(10px);
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📄 Invoice Processor</h1>
-        <p class="subtitle">Upload your PDF invoices and get them automatically renamed and organized by date/amount/issuer!</p>
+        <p class="subtitle">Upload your PDF invoices and get them automatically renamed and organized!</p>
         
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -167,6 +253,34 @@
             {% endif %}
         {% endwith %}
         
+        <!-- AI Settings Area -->
+        <div class="ai-settings">
+            <div class="ai-toggle">
+                <input type="checkbox" id="enableAI" onchange="toggleAIOptions()">
+                <label for="enableAI">🤖 Enable AI for Failed Files</label>
+            </div>
+            
+            <div class="ai-options" id="aiOptions">
+                <div class="form-group">
+                    <label for="aiModel">Select AI Model:</label>
+                    <select id="aiModel">
+                        <option value="">Please select a model...</option>
+                        <option value="gpt-4o">ChatGPT-4o</option>
+                        <option value="deepseek-v3">DeepSeek V3</option>
+                        <option value="deepseek-r1">DeepSeek R1</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="apiKey">API Key:</label>
+                    <input type="password" id="apiKey" placeholder="Enter your API key...">
+                    <div class="api-key-hint">
+                        💡 Note: Your API key will not be stored and is only used for this processing session
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                 <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Click here to select PDF files</p>
@@ -176,10 +290,16 @@
             
             <div id="fileList" class="file-list"></div>
             
-            <div class="progress" id="progress">
-                <div class="spinner"></div>
-                <p><strong>Processing your files...</strong></p>
-                <p>This may take a few minutes depending on the number of files.</p>
+            <!-- Progress Bar -->
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-status" id="progressStatus">
+                    Preparing to process files... <span class="progress-phase" id="progressPhase">OCR</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+                <div id="currentFile" style="font-size: 14px; color: #6c757d; margin-top: 10px;"></div>
             </div>
             
             <div class="results" id="results">
@@ -219,10 +339,17 @@
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
         const uploadForm = document.getElementById('uploadForm');
-        const progress = document.getElementById('progress');
+        const progressContainer = document.getElementById('progressContainer');
         const results = document.getElementById('results');
         const submitBtn = document.getElementById('submitBtn');
         let currentJobId = null;
+        let progressInterval = null;
+
+        function toggleAIOptions() {
+            const enableAI = document.getElementById('enableAI').checked;
+            const aiOptions = document.getElementById('aiOptions');
+            aiOptions.style.display = enableAI ? 'block' : 'none';
+        }
 
         fileInput.addEventListener('change', function() {
             fileList.innerHTML = '';
@@ -235,6 +362,58 @@
             }
         });
 
+        function updateProgress(data) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressStatus = document.getElementById('progressStatus');
+            const progressPhase = document.getElementById('progressPhase');
+            const currentFile = document.getElementById('currentFile');
+
+            progressBar.style.width = data.progress_percent + '%';
+            progressText.textContent = data.progress_percent + '%';
+            progressStatus.innerHTML = data.status + ' <span class="progress-phase">' + (data.phase || '') + '</span>';
+            
+            if (data.current_file) {
+                currentFile.textContent = `Currently processing: ${data.current_file}`;
+            }
+        }
+
+        function checkProgress() {
+            if (!currentJobId) return;
+
+            fetch(`/progress/${currentJobId}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateProgress(data);
+
+                    if (data.completed) {
+                        clearInterval(progressInterval);
+                        progressContainer.style.display = 'none';
+                        
+                        if (data.total_files) {
+                            document.getElementById('totalFiles').textContent = data.total_files;
+                            document.getElementById('successfulFiles').textContent = data.successful_files;
+                            document.getElementById('failedFiles').textContent = data.failed_files;
+                            results.style.display = 'block';
+                            
+                            document.getElementById('downloadBtn').onclick = function() {
+                                window.location.href = `/download/${currentJobId}`;
+                            };
+                            
+                            document.getElementById('viewReportBtn').onclick = function() {
+                                window.open(`/report/${currentJobId}`, '_blank');
+                            };
+                        }
+                        
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '🚀 Process Files';
+                    }
+                })
+                .catch(error => {
+                    console.error('Progress check error:', error);
+                });
+        }
+
         uploadForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -243,12 +422,34 @@
                 return;
             }
 
+            // Validate AI settings
+            const enableAI = document.getElementById('enableAI').checked;
+            if (enableAI) {
+                const aiModel = document.getElementById('aiModel').value;
+                const apiKey = document.getElementById('apiKey').value;
+                
+                if (!aiModel) {
+                    alert('Please select an AI model');
+                    return;
+                }
+                if (!apiKey || apiKey.length < 10) {
+                    alert('Please enter a valid API Key');
+                    return;
+                }
+            }
+
             const formData = new FormData();
             for (let i = 0; i < fileInput.files.length; i++) {
                 formData.append('files', fileInput.files[i]);
             }
+            
+            formData.append('use_ai', enableAI);
+            if (enableAI) {
+                formData.append('ai_model', document.getElementById('aiModel').value);
+                formData.append('api_key', document.getElementById('apiKey').value);
+            }
 
-            progress.style.display = 'block';
+            progressContainer.style.display = 'block';
             results.style.display = 'none';
             submitBtn.disabled = true;
             submitBtn.textContent = '🔄 Processing...';
@@ -259,35 +460,54 @@
             })
             .then(response => response.json())
             .then(data => {
-                progress.style.display = 'none';
-                
                 if (data.success) {
                     currentJobId = data.job_id;
-                    document.getElementById('totalFiles').textContent = data.total_files;
-                    document.getElementById('successfulFiles').textContent = data.successful_files;
-                    document.getElementById('failedFiles').textContent = data.failed_files;
-                    results.style.display = 'block';
                     
-                    document.getElementById('downloadBtn').onclick = function() {
-                        window.location.href = `/download/${currentJobId}`;
-                    };
-                    
-                    document.getElementById('viewReportBtn').onclick = function() {
-                        window.open(`/report/${currentJobId}`, '_blank');
-                    };
+                    // Start checking progress
+                    progressInterval = setInterval(checkProgress, 1000);
+                    checkProgress(); // Check immediately once
                 } else {
                     alert('Error: ' + data.message);
+                    progressContainer.style.display = 'none';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '🚀 Process Files';
                 }
             })
             .catch(error => {
-                progress.style.display = 'none';
+                progressContainer.style.display = 'none';
                 alert('An error occurred while processing files.');
                 console.error('Error:', error);
-            })
-            .finally(() => {
                 submitBtn.disabled = false;
                 submitBtn.textContent = '🚀 Process Files';
             });
+        });
+
+        // Drag and drop functionality
+        const uploadArea = document.querySelector('.upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.style.background = 'linear-gradient(45deg, #dee2e6, #ced4da)';
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.style.background = 'linear-gradient(45deg, #f8f9fa, #e9ecef)';
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.style.background = 'linear-gradient(45deg, #f8f9fa, #e9ecef)';
+            
+            const files = e.dataTransfer.files;
+            const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+            
+            if (pdfFiles.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                fileInput.dispatchEvent(new Event('change'));
+            } else {
+                alert('Please drop PDF files only');
+            }
         });
     </script>
 </body>
