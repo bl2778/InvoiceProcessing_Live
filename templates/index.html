@@ -3,229 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice Processor</title>
+    <title>Processing Report - Invoice Processor</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
+            margin: 0;
             padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
         }
         .container {
+            max-width: 1400px;
+            margin: 0 auto;
             background-color: white;
             padding: 40px;
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            flex: 1;
         }
         h1 {
             color: #333;
             text-align: center;
             margin-bottom: 10px;
         }
-        .subtitle {
+        .report-info {
             text-align: center;
             color: #666;
             margin-bottom: 30px;
-        }
-        
-        /* AI Settings Area */
-        .ai-settings {
-            background: #f8f9fa;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
             padding: 20px;
-            margin: 20px 0;
+            background: #f8f9fa;
+            border-radius: 10px;
         }
-        .ai-toggle {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
         }
-        .ai-toggle input[type="checkbox"] {
-            margin-right: 10px;
-            transform: scale(1.2);
-        }
-        .ai-toggle label {
-            font-weight: bold;
-            color: #495057;
-            cursor: pointer;
-        }
-        .ai-options {
-            display: none;
-            margin-top: 15px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #495057;
-        }
-        .form-group select, .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #dee2e6;
-            border-radius: 5px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        .form-group select:focus, .form-group input:focus {
-            border-color: #007bff;
-            outline: none;
-        }
-        .api-key-hint {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 5px;
-        }
-        
-        .upload-area {
-            border: 3px dashed #007bff;
-            border-radius: 15px;
-            padding: 50px;
+        .summary-card {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
             text-align: center;
-            margin: 30px 0;
-            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-            transition: all 0.3s ease;
-            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3);
         }
-        .upload-area:hover {
-            background: linear-gradient(45deg, #e9ecef, #dee2e6);
-            transform: translateY(-2px);
+        .summary-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        th {
+            background: linear-gradient(45deg, #343a40, #495057);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: bold;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover {
+            background: linear-gradient(45deg, #495057, #6c757d);
+        }
+        .sort-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sort-icon {
+            font-size: 0.8em;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+        }
+        .sort-icon.active {
+            opacity: 1;
+            color: #ffc107;
+        }
+        .sort-icon:hover {
+            opacity: 1;
+        }
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #e9ecef;
+        }
+        .failed-row {
+            background-color: #ffe6e6 !important;
+        }
+        .failed-row:hover {
+            background-color: #ffcccc !important;
+        }
+        .review-failure {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .method-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+            white-space: nowrap;
+        }
+        .method-ocr {
+            background: #28a745;
+        }
+        .method-ai {
+            background: #6f42c1;
+        }
+        .method-ai-chatgpt-4o {
+            background: #fd7e14;
+        }
+        .method-ai-deepseek-v3 {
+            background: #20c997;
+        }
+        .method-ai-deepseek-r1 {
+            background: #e83e8c;
+        }
+        .method-failed {
+            background: #dc3545;
         }
         .btn {
             background: linear-gradient(45deg, #007bff, #0056b3);
             color: white;
-            padding: 15px 30px;
+            padding: 12px 25px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
-            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
             transition: all 0.3s ease;
         }
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,123,255,0.4);
         }
-        .btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .file-list {
-            margin: 20px 0;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .file-item {
-            padding: 12px;
-            background-color: #f8f9fa;
-            margin: 8px 0;
-            border-radius: 8px;
-            border-left: 4px solid #007bff;
-        }
-        
-        /* Progress Bar Styles */
-        .progress-container {
-            display: none;
-            margin: 30px 0;
+        .actions {
             text-align: center;
-        }
-        .progress-bar-container {
-            width: 100%;
-            height: 30px;
-            background-color: #e9ecef;
-            border-radius: 15px;
-            overflow: hidden;
-            margin: 20px 0;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
-            position: relative;
-        }
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(45deg, #28a745, #20c997);
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 15px;
-        }
-        .progress-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #333;
-            font-weight: bold;
-            font-size: 14px;
-            z-index: 10;
-        }
-        .progress-status {
-            margin: 10px 0;
-            font-size: 16px;
-            color: #495057;
-        }
-        .progress-phase {
-            display: inline-block;
-            padding: 4px 12px;
-            background: #17a2b8;
-            color: white;
-            border-radius: 12px;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-        
-        .results {
-            display: none;
             margin: 30px 0;
-            padding: 25px;
-            background: linear-gradient(45deg, #d4edda, #c3e6cb);
-            border-radius: 10px;
-            border-left: 5px solid #28a745;
-        }
-        .results h3 {
-            color: #155724;
-            margin-bottom: 15px;
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #007bff;
-        }
-        .stat-label {
-            color: #666;
-            margin-top: 5px;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-top: 25px;
-        }
-        .btn-success {
-            background: linear-gradient(45deg, #28a745, #20c997);
-        }
-        .btn-info {
-            background: linear-gradient(45deg, #17a2b8, #138496);
         }
         .footer {
             text-align: center;
@@ -240,274 +172,254 @@
 </head>
 <body>
     <div class="container">
-        <h1>📄 Invoice Processor</h1>
-        <p class="subtitle">Upload your PDF invoices and get them automatically renamed and organized!</p>
+        <h1>📊 Processing Report</h1>
         
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div style="color: #dc3545; margin: 20px 0; padding: 15px; background: #f8d7da; border-radius: 5px;">
-                    {% for message in messages %}
-                        <p>{{ message }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-        
-        <!-- AI Settings Area -->
-        <div class="ai-settings">
-            <div class="ai-toggle">
-                <input type="checkbox" id="enableAI" onchange="toggleAIOptions()">
-                <label for="enableAI">🤖 Enable AI for Failed Files</label>
+        <div class="report-info">
+            <p><strong>Processing Date:</strong> {{ timestamp }}</p>
+            <p><strong>Job ID:</strong> {{ job_id }}</p>
+        </div>
+
+        <div class="summary">
+            <div class="summary-card">
+                <div class="summary-number">{{ results|length }}</div>
+                <div>Total Files</div>
             </div>
-            
-            <div class="ai-options" id="aiOptions">
-                <div class="form-group">
-                    <label for="aiModel">Select AI Model:</label>
-                    <select id="aiModel">
-                        <option value="">Please select a model...</option>
-                        <option value="gpt-4o">ChatGPT-4o</option>
-                        <option value="deepseek-v3">DeepSeek V3</option>
-                        <option value="deepseek-r1">DeepSeek R1</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="apiKey">API Key:</label>
-                    <input type="password" id="apiKey" placeholder="Enter your API key...">
-                    <div class="api-key-hint">
-                        💡 Note: Your API key will not be stored and is only used for this processing session
-                    </div>
-                </div>
+            <div class="summary-card" style="background: linear-gradient(45deg, #28a745, #20c997);">
+                <div class="summary-number">{{ results|selectattr("status", "equalto", "success")|list|length }}</div>
+                <div>Successful</div>
+            </div>
+            <div class="summary-card" style="background: linear-gradient(45deg, #dc3545, #c82333);">
+                <div class="summary-number">{{ results|selectattr("status", "equalto", "failed")|list|length }}</div>
+                <div>Failed</div>
+            </div>
+            <div class="summary-card" style="background: linear-gradient(45deg, #6f42c1, #5a32a3);">
+                <div class="summary-number">{{ results|selectattr("method", "match", "AI.*")|list|length }}</div>
+                <div>AI Processed</div>
             </div>
         </div>
-        
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <p style="font-size: 1.2em; margin-bottom: 10px;">📁 Click here to select PDF files</p>
-                <p style="color: #666;">or drag and drop them here</p>
-                <input type="file" id="fileInput" name="files" multiple accept=".pdf" style="display: none;">
-            </div>
-            
-            <div id="fileList" class="file-list"></div>
-            
-            <!-- Progress Bar -->
-            <div class="progress-container" id="progressContainer">
-                <div class="progress-status" id="progressStatus">
-                    Preparing to process files... <span class="progress-phase" id="progressPhase">OCR</span>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar" id="progressBar"></div>
-                    <div class="progress-text" id="progressText">0%</div>
-                </div>
-                <div id="currentFile" style="font-size: 14px; color: #6c757d; margin-top: 10px;"></div>
-            </div>
-            
-            <div class="results" id="results">
-                <h3>🎉 Processing Complete!</h3>
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="stat-number" id="totalFiles">0</div>
-                        <div class="stat-label">Total Files</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="successfulFiles">0</div>
-                        <div class="stat-label">Successfully Processed</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="failedFiles">0</div>
-                        <div class="stat-label">Failed to Process</div>
-                    </div>
-                </div>
-                <div class="action-buttons">
-                    <button type="button" class="btn btn-success" id="downloadBtn">📥 Download Renamed Invoices</button>
-                    <button type="button" class="btn btn-info" id="viewReportBtn">📊 View Report</button>
-                </div>
-            </div>
-            
-            <div style="text-align: center;">
-                <button type="submit" class="btn" id="submitBtn">🚀 Process Files</button>
-            </div>
-        </form>
+
+        <div class="table-container">
+            <table id="reportTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)" data-column="0">
+                            <div class="sort-header">
+                                <span>Date</span>
+                                <span class="sort-icon" id="sort-0">⇅</span>
+                            </div>
+                        </th>
+                        <th onclick="sortTable(1)" data-column="1">
+                            <div class="sort-header">
+                                <span>Amount</span>
+                                <span class="sort-icon" id="sort-1">⇅</span>
+                            </div>
+                        </th>
+                        <th onclick="sortTable(2)" data-column="2">
+                            <div class="sort-header">
+                                <span>Issuer</span>
+                                <span class="sort-icon" id="sort-2">⇅</span>
+                            </div>
+                        </th>
+                        <th onclick="sortTable(3)" data-column="3">
+                            <div class="sort-header">
+                                <span>Method</span>
+                                <span class="sort-icon" id="sort-3">⇅</span>
+                            </div>
+                        </th>
+                        <th onclick="sortTable(4)" data-column="4">
+                            <div class="sort-header">
+                                <span>Original Filename</span>
+                                <span class="sort-icon" id="sort-4">⇅</span>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    {% for result in results %}
+                    <tr {% if result.status == 'failed' %}class="failed-row"{% endif %} data-status="{{ result.status }}">
+                        <td data-original="{{ result.date }}">
+                            {% if result.status == 'failed' %}
+                                <span class="review-failure">Review Failure</span>
+                            {% else %}
+                                {{ result.date }}
+                            {% endif %}
+                        </td>
+                        <td data-original="{{ result.amount }}">
+                            {% if result.status == 'failed' %}
+                                <span class="review-failure">Review Failure</span>
+                            {% else %}
+                                {{ result.amount }}
+                            {% endif %}
+                        </td>
+                        <td data-original="{{ result.issuer }}">
+                            {% if result.status == 'failed' %}
+                                <span class="review-failure">Review Failure</span>
+                            {% else %}
+                                {{ result.issuer }}
+                            {% endif %}
+                        </td>
+                        <td data-original="{{ result.method }}">
+                            {% set method_class = result.method.lower().replace(' ', '-').replace('(', '').replace(')', '').replace('chatgpt', 'chatgpt') %}
+                            {% if result.status == 'failed' %}
+                                <span class="method-badge method-failed">Failed</span>
+                            {% elif 'AI' in result.method %}
+                                {% if 'ChatGPT' in result.method or 'GPT-4o' in result.method %}
+                                    <span class="method-badge method-ai-chatgpt-4o">{{ result.method }}</span>
+                                {% elif 'DeepSeek V3' in result.method %}
+                                    <span class="method-badge method-ai-deepseek-v3">{{ result.method }}</span>
+                                {% elif 'DeepSeek R1' in result.method %}
+                                    <span class="method-badge method-ai-deepseek-r1">{{ result.method }}</span>
+                                {% else %}
+                                    <span class="method-badge method-ai">{{ result.method }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="method-badge method-ocr">{{ result.method }}</span>
+                            {% endif %}
+                        </td>
+                        <td data-original="{{ result.original_filename }}">{{ result.original_filename }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="actions">
+            <a href="/download/{{ job_id }}" class="btn">📥 Download Renamed Invoices</a>
+            <a href="/" class="btn" style="background: linear-gradient(45deg, #6c757d, #5a6268);">🏠 Process More Files</a>
+        </div>
     </div>
 
     <div class="footer">
         <p><strong>Disclaimer:</strong> This tool is for personal use only.</p>
-        <p>© 2025 Ben Li (ben.li@bain.com). All rights reserved.</p>
+        <p>© 2024 Ben Li (ben.li@bain.com). All rights reserved.</p>
     </div>
 
     <script>
-        const fileInput = document.getElementById('fileInput');
-        const fileList = document.getElementById('fileList');
-        const uploadForm = document.getElementById('uploadForm');
-        const progressContainer = document.getElementById('progressContainer');
-        const results = document.getElementById('results');
-        const submitBtn = document.getElementById('submitBtn');
-        let currentJobId = null;
-        let progressInterval = null;
+        // Store current sort order for each column (now 5 columns)
+        let sortOrder = {0: 'none', 1: 'none', 2: 'none', 3: 'none', 4: 'none'};
 
-        function toggleAIOptions() {
-            const enableAI = document.getElementById('enableAI').checked;
-            const aiOptions = document.getElementById('aiOptions');
-            aiOptions.style.display = enableAI ? 'block' : 'none';
+        function parseChineseDate(dateStr) {
+            // Parse Chinese date format like "2024年3月15日"
+            if (dateStr === 'Review Failure' || dateStr === 'Error' || dateStr === 'N/A') {
+                return new Date('9999-12-31'); // Put errors at the end
+            }
+            
+            const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+            if (match) {
+                const [, year, month, day] = match;
+                return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            }
+            return new Date('9999-12-31'); // Unknown format, put at end
         }
 
-        fileInput.addEventListener('change', function() {
-            fileList.innerHTML = '';
-            for (let i = 0; i < this.files.length; i++) {
-                const file = this.files[i];
-                const fileItem = document.createElement('div');
-                fileItem.className = 'file-item';
-                fileItem.textContent = `📄 ${file.name}`;
-                fileList.appendChild(fileItem);
+        function parseAmount(amountStr) {
+            // Extract numeric value from amount string
+            if (amountStr === 'Review Failure' || amountStr === 'Error' || amountStr === 'N/A') {
+                return -1; // Put errors at the end
             }
-        });
-
-        function updateProgress(data) {
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            const progressStatus = document.getElementById('progressStatus');
-            const progressPhase = document.getElementById('progressPhase');
-            const currentFile = document.getElementById('currentFile');
-
-            progressBar.style.width = data.progress_percent + '%';
-            progressText.textContent = data.progress_percent + '%';
-            progressStatus.innerHTML = data.status + ' <span class="progress-phase">' + (data.phase || '') + '</span>';
             
-            if (data.current_file) {
-                currentFile.textContent = `Currently processing: ${data.current_file}`;
-            }
+            // Remove non-numeric characters except decimal point
+            const numStr = amountStr.replace(/[^\d.-]/g, '');
+            const num = parseFloat(numStr);
+            return isNaN(num) ? -1 : num;
         }
 
-        function checkProgress() {
-            if (!currentJobId) return;
-
-            fetch(`/progress/${currentJobId}`)
-                .then(response => response.json())
-                .then(data => {
-                    updateProgress(data);
-
-                    if (data.completed) {
-                        clearInterval(progressInterval);
-                        progressContainer.style.display = 'none';
-                        
-                        if (data.total_files) {
-                            document.getElementById('totalFiles').textContent = data.total_files;
-                            document.getElementById('successfulFiles').textContent = data.successful_files;
-                            document.getElementById('failedFiles').textContent = data.failed_files;
-                            results.style.display = 'block';
-                            
-                            document.getElementById('downloadBtn').onclick = function() {
-                                window.location.href = `/download/${currentJobId}`;
-                            };
-                            
-                            document.getElementById('viewReportBtn').onclick = function() {
-                                window.open(`/report/${currentJobId}`, '_blank');
-                            };
-                        }
-                        
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = '🚀 Process Files';
-                    }
-                })
-                .catch(error => {
-                    console.error('Progress check error:', error);
-                });
-        }
-
-        uploadForm.addEventListener('submit', function(e) {
-            e.preventDefault();
+        function sortTable(columnIndex) {
+            const table = document.getElementById('reportTable');
+            const tbody = document.getElementById('tableBody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
             
-            if (fileInput.files.length === 0) {
-                alert('Please select at least one PDF file');
-                return;
-            }
-
-            // Validate AI settings
-            const enableAI = document.getElementById('enableAI').checked;
-            if (enableAI) {
-                const aiModel = document.getElementById('aiModel').value;
-                const apiKey = document.getElementById('apiKey').value;
-                
-                if (!aiModel) {
-                    alert('Please select an AI model');
-                    return;
-                }
-                if (!apiKey || apiKey.length < 10) {
-                    alert('Please enter a valid API Key');
-                    return;
-                }
-            }
-
-            const formData = new FormData();
-            for (let i = 0; i < fileInput.files.length; i++) {
-                formData.append('files', fileInput.files[i]);
-            }
+            // Separate successful and failed rows
+            const successRows = rows.filter(row => row.getAttribute('data-status') === 'success');
+            const failedRows = rows.filter(row => row.getAttribute('data-status') === 'failed');
             
-            formData.append('use_ai', enableAI);
-            if (enableAI) {
-                formData.append('ai_model', document.getElementById('aiModel').value);
-                formData.append('api_key', document.getElementById('apiKey').value);
-            }
-
-            progressContainer.style.display = 'block';
-            results.style.display = 'none';
-            submitBtn.disabled = true;
-            submitBtn.textContent = '🔄 Processing...';
-
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    currentJobId = data.job_id;
-                    
-                    // Start checking progress
-                    progressInterval = setInterval(checkProgress, 1000);
-                    checkProgress(); // Check immediately once
-                } else {
-                    alert('Error: ' + data.message);
-                    progressContainer.style.display = 'none';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = '🚀 Process Files';
-                }
-            })
-            .catch(error => {
-                progressContainer.style.display = 'none';
-                alert('An error occurred while processing files.');
-                console.error('Error:', error);
-                submitBtn.disabled = false;
-                submitBtn.textContent = '🚀 Process Files';
-            });
-        });
-
-        // Drag and drop functionality
-        const uploadArea = document.querySelector('.upload-area');
-        
-        uploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            uploadArea.style.background = 'linear-gradient(45deg, #dee2e6, #ced4da)';
-        });
-
-        uploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            uploadArea.style.background = 'linear-gradient(45deg, #f8f9fa, #e9ecef)';
-        });
-
-        uploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            uploadArea.style.background = 'linear-gradient(45deg, #f8f9fa, #e9ecef)';
-            
-            const files = e.dataTransfer.files;
-            const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
-            
-            if (pdfFiles.length > 0) {
-                fileInput.files = e.dataTransfer.files;
-                fileInput.dispatchEvent(new Event('change'));
+            // Update sort order
+            if (sortOrder[columnIndex] === 'none' || sortOrder[columnIndex] === 'desc') {
+                sortOrder[columnIndex] = 'asc';
             } else {
-                alert('Please drop PDF files only');
+                sortOrder[columnIndex] = 'desc';
             }
+            
+            // Reset other columns
+            for (let i = 0; i < 5; i++) {
+                if (i !== columnIndex) {
+                    sortOrder[i] = 'none';
+                    document.getElementById(`sort-${i}`).innerHTML = '⇅';
+                    document.getElementById(`sort-${i}`).classList.remove('active');
+                }
+            }
+            
+            // Update sort icon
+            const sortIcon = document.getElementById(`sort-${columnIndex}`);
+            sortIcon.classList.add('active');
+            sortIcon.innerHTML = sortOrder[columnIndex] === 'asc' ? '↑' : '↓';
+            
+            // Sort only the successful rows
+            successRows.sort((a, b) => {
+                const aCell = a.cells[columnIndex];
+                const bCell = b.cells[columnIndex];
+                const aData = aCell.getAttribute('data-original') || aCell.textContent.trim();
+                const bData = bCell.getAttribute('data-original') || bCell.textContent.trim();
+                
+                let aValue, bValue;
+                
+                // Handle different column types
+                switch (columnIndex) {
+                    case 0: // Date column
+                        aValue = parseChineseDate(aData);
+                        bValue = parseChineseDate(bData);
+                        break;
+                    case 1: // Amount column
+                        aValue = parseAmount(aData);
+                        bValue = parseAmount(bData);
+                        break;
+                    case 2: // Issuer column
+                    case 3: // Method column
+                    case 4: // Filename column
+                        aValue = aData.toLowerCase();
+                        bValue = bData.toLowerCase();
+                        break;
+                    default:
+                        aValue = aData;
+                        bValue = bData;
+                }
+                
+                // Compare values
+                let comparison = 0;
+                if (columnIndex === 0 || columnIndex === 1) {
+                    // Date and Amount comparison
+                    comparison = aValue - bValue;
+                } else {
+                    // String comparison
+                    comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                }
+                
+                return sortOrder[columnIndex] === 'asc' ? comparison : -comparison;
+            });
+            
+            // Clear the table body
+            tbody.innerHTML = '';
+            
+            // Reorder the table: successful rows first, then failed rows at the end
+            successRows.forEach(row => tbody.appendChild(row));
+            failedRows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Add hover effects to headers
+        document.querySelectorAll('th').forEach(header => {
+            header.addEventListener('mouseenter', function() {
+                const sortIcon = this.querySelector('.sort-icon');
+                if (sortIcon && !sortIcon.classList.contains('active')) {
+                    sortIcon.style.opacity = '1';
+                }
+            });
+            
+            header.addEventListener('mouseleave', function() {
+                const sortIcon = this.querySelector('.sort-icon');
+                if (sortIcon && !sortIcon.classList.contains('active')) {
+                    sortIcon.style.opacity = '0.7';
+                }
+            });
         });
     </script>
 </body>
