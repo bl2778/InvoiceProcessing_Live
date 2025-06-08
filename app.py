@@ -117,27 +117,6 @@ def log_access(endpoint, extra_data=None):
     except Exception as e:
         print(f"记录访问日志失败: {e}")
 
-def log_access(endpoint, extra_data=None):
-    """记录用户访问"""
-    try:
-        log_entry = {
-            'timestamp': (datetime.now() + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S'),
-            'ip': request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown')),
-            'user_agent': request.headers.get('User-Agent', 'unknown'),
-            'endpoint': endpoint,
-            'method': request.method,
-            'referer': request.headers.get('Referer', 'direct'),
-            'extra_data': extra_data or {}
-        }
-        access_logs.append(log_entry)
-        
-        if len(access_logs) > 1000:
-            access_logs.pop(0)
-            
-        print(f"访问记录: {log_entry['ip']} -> {endpoint}")
-    except Exception as e:
-        print(f"记录访问日志失败: {e}")
-
 def require_admin(f):
     """管理员验证装饰器"""
     @wraps(f)
