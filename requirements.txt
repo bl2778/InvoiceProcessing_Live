@@ -4,3 +4,4 @@ pandas==2.1.4
 numpy==1.26.2
 regex==2023.10.3
 Werkzeug==3.0.1
+requests==2.31.0
